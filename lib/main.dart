@@ -1,9 +1,27 @@
+import 'dart:js';
+
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 void main() {
   runApp(Website());
+}
+
+// extremely useful for debugging
+class BlockingClass extends StatelessWidget {
+  const BlockingClass({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    print(screenWidth);
+    print(screenHeight);
+    print(" ");
+    return Container(
+        height: screenHeight, width: screenWidth, color: Colors.grey);
+  }
 }
 
 // the overall app
@@ -18,7 +36,7 @@ class Website extends StatelessWidget {
             title: "mxpoch's website",
             theme: ThemeData(
                 useMaterial3: true,
-                colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+                colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueAccent),
                 textTheme: GoogleFonts.robotoSlabTextTheme(
                     Theme.of(context).textTheme)),
             home: MainPage()));
@@ -29,11 +47,57 @@ class MainPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: Column(
+        body: ListView(
       children: [
         GreetingCard(),
+        Curation(),
+        // BlockingClass(),
       ],
     ));
+  }
+}
+
+class Curation extends StatefulWidget {
+  const Curation({super.key});
+
+  @override
+  State<Curation> createState() => _CurationState();
+}
+
+class _CurationState extends State<Curation>
+    with SingleTickerProviderStateMixin {
+  late TabController tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [Navbar(controller: tabController), BlockingClass()],
+    );
+  }
+}
+
+class Navbar extends StatelessWidget {
+  Navbar({required this.controller});
+
+  final TabController controller;
+  @override
+  Widget build(BuildContext context) {
+    double screenWidth = MediaQuery.of(context).size.width;
+    return Container(
+        width: screenWidth * 0.25,
+        height: 50,
+        child: TabBar(
+          controller: controller,
+          tabs: [Tab(text: "Personal"), Tab(text: "Professional")],
+        ));
   }
 }
 
@@ -129,8 +193,11 @@ class _TitleCardState extends State<TitleCard> {
                       Text(
                           "I spend most of my days grokking things I find interesting (everything) and how to grok better.",
                           style: TextStyle(fontSize: 20)),
-                      Text("Here are some things I did:",
-                          style: TextStyle(fontSize: 20))
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 50, 0, 50),
+                        child: Text("Here are some things I did:",
+                            style: TextStyle(fontSize: 20)),
+                      )
                     ],
                   ),
                 )
