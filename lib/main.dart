@@ -1,8 +1,9 @@
-import 'dart:js';
-
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle; // for reading filepaths
+import 'package:flutter_markdown/flutter_markdown.dart'; // markdown rendering
 import 'package:provider/provider.dart';
+import 'package:tuple/tuple.dart';
 
 void main() {
   runApp(Website());
@@ -10,19 +11,22 @@ void main() {
 
 // extremely useful for debugging
 class BlockingClass extends StatelessWidget {
-  const BlockingClass({super.key});
+  const BlockingClass({required this.color});
+
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    print(screenWidth);
-    print(screenHeight);
-    print(" ");
-    return Container(
-        height: screenHeight, width: screenWidth, color: Colors.grey);
+    // final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height * 0.75;
+
+    return Expanded(
+      child: Container(height: screenHeight, color: color),
+    );
   }
 }
+
+class WebsiteState extends ChangeNotifier {}
 
 // the overall app
 class Website extends StatelessWidget {
@@ -43,6 +47,7 @@ class Website extends StatelessWidget {
   }
 }
 
+// holder page
 class MainPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -51,12 +56,12 @@ class MainPage extends StatelessWidget {
       children: [
         GreetingCard(),
         Curation(),
-        // BlockingClass(),
       ],
     ));
   }
 }
 
+// the actual blog
 class Curation extends StatefulWidget {
   const Curation({super.key});
 
@@ -66,12 +71,66 @@ class Curation extends StatefulWidget {
 
 class _CurationState extends State<Curation>
     with SingleTickerProviderStateMixin {
+  // initializing the controllers
   late TabController tabController;
+  late int projectSelector;
+  // initializing the content
+  late List<Tuple2<String, Future<String>>> personal;
+  late List<Tuple2<String, Future<String>>> professional;
+  late List<Tuple2<String, Future<String>>> about;
+
+  // TODO: Fix this workaround when actually implementing the DB
+  late Future<String> _pfile1;
+  late Future<String> _pfile2;
+
+  late Future<String> _profile1;
+  late Future<String> _profile2;
+
+  late Future<String> _about;
+
+  late List<List<Tuple2<String, Future<String>>>> everything;
+
+  late int tabIndex;
 
   @override
   void initState() {
     super.initState();
-    tabController = TabController(length: 2, vsync: this);
+    // populating the controllers
+    tabController = TabController(length: 3, vsync: this);
+    tabIndex = tabController.index;
+    tabController.addListener(() {
+      setState(() {
+        tabIndex = tabController.index;
+      });
+    });
+    projectSelector = 0;
+
+    // populating the content
+    // once firebase is working, turn this into a loop.
+    _pfile2 = getFileData("personal/personal2.md");
+    _pfile1 = getFileData("personal/personal.md");
+
+    _profile1 = getFileData("professional/professional.md");
+    _profile2 = getFileData("professional/professional2.md");
+
+    _about = getFileData("about/about.md");
+
+    personal = [
+      Tuple2<String, Future<String>>("Personal1", _pfile1),
+      Tuple2<String, Future<String>>("Personal2", _pfile2)
+    ];
+    professional = [
+      Tuple2<String, Future<String>>("Pro1", _profile1),
+      Tuple2<String, Future<String>>("Pro2", _profile2)
+    ];
+    about = [Tuple2<String, Future<String>>("about", _about)];
+
+    everything = [personal, professional, about];
+  }
+
+  // loading the files via path.
+  Future<String> getFileData(String path) async {
+    return await rootBundle.loadString(path);
   }
 
   @override
@@ -79,30 +138,184 @@ class _CurationState extends State<Curation>
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.center,
-      children: [Navbar(controller: tabController), BlockingClass()],
+      children: [
+        Navbar(controller: tabController),
+        Padding(
+          padding: const EdgeInsets.only(top: 100),
+          child: Blog(
+              tabIndex: tabIndex,
+              projectSelector: projectSelector,
+              everything: everything),
+        )
+      ],
     );
   }
 }
 
+// the blog itself
+class Blog extends StatefulWidget {
+  const Blog(
+      {required this.tabIndex,
+      required this.projectSelector,
+      required this.everything});
+
+  final int tabIndex;
+  final int projectSelector;
+  final List<List<Tuple2<String, Future<String>>>> everything;
+
+  @override
+  State<Blog> createState() => _BlogState();
+}
+
+class _BlogState extends State<Blog> with TickerProviderStateMixin {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(50, 0, 50, 0),
+          child: ProjectMenu(
+              tabIndex: widget.tabIndex,
+              projectSelector: widget.projectSelector,
+              everything: widget.everything),
+        ),
+        // BlogViewer(
+        // controller: widget.controller,
+        // projectSelector: widget.projectSelector,
+        // everything: widget.everything),
+      ],
+    );
+  }
+}
+
+// where the markdown files are displayed
+// class BlogViewer extends StatefulWidget {
+//   const BlogViewer(
+//       {required this.controller,
+//       required this.projectSelector,
+//       required this.everything});
+
+//   final List<List<Tuple2<String, Future<String>>>> everything;
+//   final int projectSelector;
+//   final TabController controller;
+
+//   @override
+//   State<BlogViewer> createState() => _BlogViewerState();
+// }
+
+// class _BlogViewerState extends State<BlogViewer> {
+//   // @override
+//   // void initState() {}
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//         decoration: BoxDecoration(
+//             color: Colors.white,
+//             borderRadius: BorderRadius.circular(10),
+//             boxShadow: [
+//               BoxShadow(
+//                 color: Colors.grey.withOpacity(0.25),
+//                 spreadRadius: 3,
+//                 blurRadius: 5,
+//                 offset: Offset(3, 10),
+//               )
+//             ]),
+//         height: MediaQuery.of(context).size.height * 0.75,
+//         width: MediaQuery.of(context).size.width * 0.5,
+//         child: FutureBuilder(
+//           future: getFileData('blog.md'),
+//           builder: (context, snapshot) {
+//             if (snapshot.hasData) {
+//               return Markdown(data: snapshot.data!, selectable: true);
+//             }
+//             return Text("Loading Markdown Info...");
+//           },
+//         ));
+//   }
+// }
+
+// The interactive project menu
+class ProjectMenu extends StatefulWidget {
+  const ProjectMenu(
+      {required this.tabIndex,
+      required this.projectSelector,
+      required this.everything});
+
+  final List<List<Tuple2<String, Future<String>>>> everything;
+  final int projectSelector;
+  final int tabIndex;
+
+  @override
+  State<ProjectMenu> createState() => _ProjectMenuState();
+}
+
+class _ProjectMenuState extends State<ProjectMenu> {
+  var selectedIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(mainAxisAlignment: MainAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 5),
+        child: Row(
+          children: [
+            ColoredSquare(Color.fromARGB(255, 224, 15, 0)),
+            ColoredSquare(Color.fromARGB(255, 0, 212, 0)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 0, 225, 0),
+              child: ColoredSquare(Color.fromARGB(255, 0, 89, 255)),
+            ),
+          ],
+        ),
+      ),
+      Text("In chronological order: ", style: TextStyle(fontSize: 25)),
+      SizedBox(
+        height: MediaQuery.of(context).size.height * 0.75,
+        width: 200,
+        child: ListView(
+          children: widget.everything[widget.tabIndex]
+              .map((e) => ListTile(
+                    title: Text(e.item1),
+                    mouseCursor: MaterialStateMouseCursor.clickable,
+                    hoverColor: Colors.blue,
+                    focusColor: Colors.orange,
+                    onTap: () {
+                      print(e);
+                    },
+                  ))
+              .toList(),
+        ),
+      ),
+    ]);
+  }
+}
+
+// major navigation menu
 class Navbar extends StatelessWidget {
-  Navbar({required this.controller});
+  const Navbar({required this.controller});
 
   final TabController controller;
+
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
     return Container(
-        width: screenWidth * 0.25,
+        width: screenWidth * 0.20,
         height: 50,
         child: TabBar(
+          splashBorderRadius: BorderRadius.circular(40),
           controller: controller,
-          tabs: [Tab(text: "Personal"), Tab(text: "Professional")],
+          tabs: [
+            Tab(text: "Personal"),
+            Tab(text: "Professional"),
+            Tab(text: "About")
+          ],
         ));
   }
 }
 
-class WebsiteState extends ChangeNotifier {}
-
+// The text-based greeting card
 class GreetingCard extends StatelessWidget {
   const GreetingCard({super.key});
 
@@ -127,7 +340,7 @@ class GreetingCard extends StatelessWidget {
                 child: Column(
                   children: [
                     Text(
-                      '"I am enough of the artist to draw freely upon my imagination. Imagination is more important than knowledge. Knowledge is limit. Imagination encircles the world."',
+                      '"I am enough of the artist to draw freely upon my imagination. Imagination is more important than knowledge. Knowledge is limited. Imagination encircles the world."',
                       textAlign: TextAlign.left,
                       style:
                           TextStyle(color: Color.fromARGB(255, 107, 107, 107)),
@@ -172,7 +385,9 @@ class _TitleCardState extends State<TitleCard> {
                   style: TextStyle(fontSize: 55, fontWeight: FontWeight.bold),
                 ),
                 Text("Blockchain Engineer",
-                    textAlign: TextAlign.left, style: TextStyle(fontSize: 30)),
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                        fontSize: 30, color: Color.fromARGB(255, 99, 99, 99))),
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: Row(
