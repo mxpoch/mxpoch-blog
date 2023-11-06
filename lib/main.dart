@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show rootBundle; // for reading filepaths
 import 'package:flutter_markdown/flutter_markdown.dart'; // markdown rendering
 import 'package:provider/provider.dart';
 import 'package:tuple/tuple.dart';
+import 'package:collection/collection.dart';
 
 void main() {
   runApp(Website());
@@ -73,7 +74,7 @@ class _CurationState extends State<Curation>
     with SingleTickerProviderStateMixin {
   // initializing the controllers
   late TabController tabController;
-  late int projectSelector;
+  late int tabIndex;
   // initializing the content
   late List<Tuple2<String, Future<String>>> personal;
   late List<Tuple2<String, Future<String>>> professional;
@@ -90,7 +91,7 @@ class _CurationState extends State<Curation>
 
   late List<List<Tuple2<String, Future<String>>>> everything;
 
-  late int tabIndex;
+  late int projectSelector;
 
   @override
   void initState() {
@@ -101,6 +102,7 @@ class _CurationState extends State<Curation>
     tabController.addListener(() {
       setState(() {
         tabIndex = tabController.index;
+        projectSelector = 0;
       });
     });
     projectSelector = 0;
@@ -144,23 +146,35 @@ class _CurationState extends State<Curation>
           padding: const EdgeInsets.only(top: 100),
           child: Blog(
               tabIndex: tabIndex,
+              changeProject: changeProject,
               projectSelector: projectSelector,
               everything: everything),
         )
       ],
     );
   }
+
+  // for the project selector
+  changeProject(i) => setState(() {
+        projectSelector = i;
+      });
+}
+
+class PR {
+  int selectedProject = 0;
 }
 
 // the blog itself
 class Blog extends StatefulWidget {
   const Blog(
       {required this.tabIndex,
+      required this.changeProject,
       required this.projectSelector,
       required this.everything});
 
   final int tabIndex;
   final int projectSelector;
+  final Function changeProject;
   final List<List<Tuple2<String, Future<String>>>> everything;
 
   @override
@@ -176,68 +190,22 @@ class _BlogState extends State<Blog> with TickerProviderStateMixin {
           padding: const EdgeInsets.fromLTRB(50, 0, 50, 0),
           child: ProjectMenu(
               tabIndex: widget.tabIndex,
+              changeProject: widget.changeProject,
               projectSelector: widget.projectSelector,
               everything: widget.everything),
         ),
-        // BlogViewer(
-        // controller: widget.controller,
-        // projectSelector: widget.projectSelector,
-        // everything: widget.everything),
+        BlogViewer(
+            tabIndex: widget.tabIndex,
+            projectSelector: widget.projectSelector,
+            everything: widget.everything),
       ],
     );
   }
 }
 
 // where the markdown files are displayed
-// class BlogViewer extends StatefulWidget {
-//   const BlogViewer(
-//       {required this.controller,
-//       required this.projectSelector,
-//       required this.everything});
-
-//   final List<List<Tuple2<String, Future<String>>>> everything;
-//   final int projectSelector;
-//   final TabController controller;
-
-//   @override
-//   State<BlogViewer> createState() => _BlogViewerState();
-// }
-
-// class _BlogViewerState extends State<BlogViewer> {
-//   // @override
-//   // void initState() {}
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Container(
-//         decoration: BoxDecoration(
-//             color: Colors.white,
-//             borderRadius: BorderRadius.circular(10),
-//             boxShadow: [
-//               BoxShadow(
-//                 color: Colors.grey.withOpacity(0.25),
-//                 spreadRadius: 3,
-//                 blurRadius: 5,
-//                 offset: Offset(3, 10),
-//               )
-//             ]),
-//         height: MediaQuery.of(context).size.height * 0.75,
-//         width: MediaQuery.of(context).size.width * 0.5,
-//         child: FutureBuilder(
-//           future: getFileData('blog.md'),
-//           builder: (context, snapshot) {
-//             if (snapshot.hasData) {
-//               return Markdown(data: snapshot.data!, selectable: true);
-//             }
-//             return Text("Loading Markdown Info...");
-//           },
-//         ));
-//   }
-// }
-
-// The interactive project menu
-class ProjectMenu extends StatefulWidget {
-  const ProjectMenu(
+class BlogViewer extends StatefulWidget {
+  const BlogViewer(
       {required this.tabIndex,
       required this.projectSelector,
       required this.everything});
@@ -247,10 +215,53 @@ class ProjectMenu extends StatefulWidget {
   final int tabIndex;
 
   @override
-  State<ProjectMenu> createState() => _ProjectMenuState();
+  State<BlogViewer> createState() => _BlogViewerState();
 }
 
-class _ProjectMenuState extends State<ProjectMenu> {
+class _BlogViewerState extends State<BlogViewer> {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.25),
+                spreadRadius: 3,
+                blurRadius: 5,
+                offset: Offset(3, 10),
+              )
+            ]),
+        height: MediaQuery.of(context).size.height * 0.75,
+        width: MediaQuery.of(context).size.width * 0.5,
+        child: FutureBuilder(
+          future:
+              widget.everything[widget.tabIndex][widget.projectSelector].item2,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return Text("Loading Markdown Info...");
+            }
+            return Markdown(data: snapshot.data!, selectable: true);
+          },
+        ));
+  }
+}
+
+// The interactive project menu
+class ProjectMenu extends StatelessWidget {
+  ProjectMenu(
+      {required this.tabIndex,
+      required this.changeProject,
+      required this.projectSelector,
+      required this.everything});
+
+  // mutable inputs
+  List<List<Tuple2<String, Future<String>>>> everything;
+  int tabIndex;
+  int projectSelector;
+  Function changeProject;
+
   var selectedIndex = 0;
 
   @override
@@ -274,14 +285,14 @@ class _ProjectMenuState extends State<ProjectMenu> {
         height: MediaQuery.of(context).size.height * 0.75,
         width: 200,
         child: ListView(
-          children: widget.everything[widget.tabIndex]
-              .map((e) => ListTile(
+          children: everything[tabIndex]
+              .mapIndexed((i, e) => ListTile(
                     title: Text(e.item1),
                     mouseCursor: MaterialStateMouseCursor.clickable,
                     hoverColor: Colors.blue,
                     focusColor: Colors.orange,
                     onTap: () {
-                      print(e);
+                      changeProject(i);
                     },
                   ))
               .toList(),
