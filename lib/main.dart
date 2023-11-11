@@ -1,10 +1,11 @@
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle; // for reading filepaths
 import 'package:flutter_markdown/flutter_markdown.dart'; // markdown rendering
 import 'package:provider/provider.dart';
 import 'package:tuple/tuple.dart';
 import 'package:collection/collection.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 void main() {
   runApp(Website());
@@ -75,23 +76,8 @@ class _CurationState extends State<Curation>
   // initializing the controllers
   late TabController tabController;
   late int tabIndex;
-  // initializing the content
-  late List<Tuple2<String, Future<String>>> personal;
-  late List<Tuple2<String, Future<String>>> professional;
-  late List<Tuple2<String, Future<String>>> about;
-
-  // TODO: Fix this workaround when actually implementing the DB
-  late Future<String> _pfile1;
-  late Future<String> _pfile2;
-
-  late Future<String> _profile1;
-  late Future<String> _profile2;
-
-  late Future<String> _about;
-
-  late List<List<Tuple2<String, Future<String>>>> everything;
-
   late int projectSelector;
+  late Future<http.Response> blogData;
 
   @override
   void initState() {
@@ -103,37 +89,44 @@ class _CurationState extends State<Curation>
       setState(() {
         tabIndex = tabController.index;
         projectSelector = 0;
+        blogData = fetchCurrentTab(tabIndex);
       });
     });
     projectSelector = 0;
-
-    // populating the content
-    // once firebase is working, turn this into a loop.
-    _pfile2 = getFileData("personal/personal2.md");
-    _pfile1 = getFileData("personal/personal.md");
-
-    _profile1 = getFileData("professional/professional.md");
-    _profile2 = getFileData("professional/professional2.md");
-
-    _about = getFileData("about/about.md");
-
-    personal = [
-      Tuple2<String, Future<String>>("Personal1", _pfile1),
-      Tuple2<String, Future<String>>("Personal2", _pfile2)
-    ];
-    professional = [
-      Tuple2<String, Future<String>>("Pro1", _profile1),
-      Tuple2<String, Future<String>>("Pro2", _profile2)
-    ];
-    about = [Tuple2<String, Future<String>>("about", _about)];
-
-    everything = [personal, professional, about];
+    blogData = fetchCurrentTab(tabIndex);
   }
 
-  // loading the files via path.
-  Future<String> getFileData(String path) async {
-    return await rootBundle.loadString(path);
+  // fetching the data from the API
+  Future<http.Response> fetchCurrentTab(tabIndex) async {
+    // setting the right URL
+    late String uri;
+    switch (tabIndex) {
+      case 0:
+        uri = "https://mxpoch.com/get_personal.php";
+      case 1:
+        uri = "https://mxpoch.com/get_professional.php";
+      case 2:
+        uri = "https://mxpoch.com/get_about.php";
+    }
+
+    // fetching the blog data from the API
+    http.Response result;
+    int numReq = 0;
+
+    // try requesting the blog information multiple times, unless the server is truly unreachable.
+    do {
+      result = await http.get(Uri.parse(uri), headers: {}).timeout(
+          const Duration(seconds: 1),
+          onTimeout: () => http.Response('Error', 400));
+      numReq += 1;
+    } while (result.statusCode != 200 || numReq > 20);
+    return result;
   }
+
+  // for the project selector
+  changeProject(i) => setState(() {
+        projectSelector = i;
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -143,25 +136,16 @@ class _CurationState extends State<Curation>
       children: [
         Navbar(controller: tabController),
         Padding(
-          padding: const EdgeInsets.only(top: 100),
+          padding: const EdgeInsets.only(top: 60),
           child: Blog(
               tabIndex: tabIndex,
               changeProject: changeProject,
               projectSelector: projectSelector,
-              everything: everything),
+              blogData: blogData),
         )
       ],
     );
   }
-
-  // for the project selector
-  changeProject(i) => setState(() {
-        projectSelector = i;
-      });
-}
-
-class PR {
-  int selectedProject = 0;
 }
 
 // the blog itself
@@ -170,12 +154,12 @@ class Blog extends StatefulWidget {
       {required this.tabIndex,
       required this.changeProject,
       required this.projectSelector,
-      required this.everything});
+      required this.blogData});
 
   final int tabIndex;
   final int projectSelector;
   final Function changeProject;
-  final List<List<Tuple2<String, Future<String>>>> everything;
+  final Future<http.Response> blogData;
 
   @override
   State<Blog> createState() => _BlogState();
@@ -187,17 +171,19 @@ class _BlogState extends State<Blog> with TickerProviderStateMixin {
     return Row(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(50, 0, 50, 0),
+          padding: const EdgeInsets.fromLTRB(60, 0, 50, 0),
           child: ProjectMenu(
               tabIndex: widget.tabIndex,
               changeProject: widget.changeProject,
               projectSelector: widget.projectSelector,
-              everything: widget.everything),
+              blogData: widget.blogData),
+        ),
+        SizedBox(
+          height: MediaQuery.of(context).size.height * 0.15,
+          width: MediaQuery.of(context).size.width * 0.15,
         ),
         BlogViewer(
-            tabIndex: widget.tabIndex,
-            projectSelector: widget.projectSelector,
-            everything: widget.everything),
+            projectSelector: widget.projectSelector, blogData: widget.blogData),
       ],
     );
   }
@@ -205,46 +191,42 @@ class _BlogState extends State<Blog> with TickerProviderStateMixin {
 
 // where the markdown files are displayed
 class BlogViewer extends StatefulWidget {
-  const BlogViewer(
-      {required this.tabIndex,
-      required this.projectSelector,
-      required this.everything});
+  const BlogViewer({required this.projectSelector, required this.blogData});
 
-  final List<List<Tuple2<String, Future<String>>>> everything;
+  final Future<http.Response> blogData;
   final int projectSelector;
-  final int tabIndex;
 
   @override
   State<BlogViewer> createState() => _BlogViewerState();
 }
 
 class _BlogViewerState extends State<BlogViewer> {
+  // loading the blogpost
+  String getContent(blogData, projectSelect) {
+    List<dynamic> allPosts = jsonDecode(blogData.body);
+    return allPosts[projectSelect]['content'];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
         decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.25),
-                spreadRadius: 3,
-                blurRadius: 5,
-                offset: Offset(3, 10),
-              )
-            ]),
+            border: Border(
+          left: BorderSide(width: 0.5, color: Colors.grey),
+          right: BorderSide(width: 0.5, color: Colors.grey),
+        )),
         height: MediaQuery.of(context).size.height * 0.75,
-        width: MediaQuery.of(context).size.width * 0.5,
+        width: MediaQuery.of(context).size.width * 0.4,
         child: FutureBuilder(
-          future:
-              widget.everything[widget.tabIndex][widget.projectSelector].item2,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return Text("Loading Markdown Info...");
-            }
-            return Markdown(data: snapshot.data!, selectable: true);
-          },
-        ));
+            future: widget.blogData,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return Text("Loading blog post...");
+              }
+              return Markdown(
+                  data: getContent(snapshot.data!, widget.projectSelector),
+                  selectable: true);
+            }));
   }
 }
 
@@ -254,15 +236,28 @@ class ProjectMenu extends StatelessWidget {
       {required this.tabIndex,
       required this.changeProject,
       required this.projectSelector,
-      required this.everything});
+      required this.blogData});
 
   // mutable inputs
-  List<List<Tuple2<String, Future<String>>>> everything;
+  Future<http.Response> blogData;
   int tabIndex;
   int projectSelector;
   Function changeProject;
 
   var selectedIndex = 0;
+
+  // loading the blogpost titles
+  List<String> getPosts(blogData) {
+    List<dynamic> allPosts = jsonDecode(blogData.body);
+    // sorting by date
+    allPosts.sort((a, b) => a['date'].compareTo(b['date']));
+    // extracting the post titles
+    List<String> postTitles = [];
+    for (var post in allPosts) {
+      postTitles.add(post['filename']);
+    }
+    return postTitles;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -281,23 +276,31 @@ class ProjectMenu extends StatelessWidget {
         ),
       ),
       Text("In chronological order: ", style: TextStyle(fontSize: 25)),
-      SizedBox(
-        height: MediaQuery.of(context).size.height * 0.75,
-        width: 200,
-        child: ListView(
-          children: everything[tabIndex]
-              .mapIndexed((i, e) => ListTile(
-                    title: Text(e.item1),
-                    mouseCursor: MaterialStateMouseCursor.clickable,
-                    hoverColor: Colors.blue,
-                    focusColor: Colors.orange,
-                    onTap: () {
-                      changeProject(i);
-                    },
-                  ))
-              .toList(),
-        ),
-      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(0, 10, 70, 0),
+        child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.75,
+            width: 160,
+            child: FutureBuilder(
+                future: blogData,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return Text("Waiting for posts to load...");
+                  }
+                  return ListView(
+                    children: getPosts(snapshot.data!)
+                        .mapIndexed((i, e) => ListTile(
+                              title: Text(e),
+                              mouseCursor: MaterialStateMouseCursor.clickable,
+                              hoverColor: Colors.grey[400],
+                              onTap: () {
+                                changeProject(i);
+                              },
+                            ))
+                        .toList(),
+                  );
+                })),
+      )
     ]);
   }
 }
@@ -420,7 +423,7 @@ class _TitleCardState extends State<TitleCard> {
                           "I spend most of my days grokking things I find interesting (everything) and how to grok better.",
                           style: TextStyle(fontSize: 20)),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 50, 0, 50),
+                        padding: const EdgeInsets.fromLTRB(0, 50, 0, 100),
                         child: Text("Here are some things I did:",
                             style: TextStyle(fontSize: 20)),
                       )
