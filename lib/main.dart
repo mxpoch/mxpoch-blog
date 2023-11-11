@@ -39,7 +39,7 @@ class Website extends StatelessWidget {
     return ChangeNotifierProvider(
         create: (context) => WebsiteState(),
         child: MaterialApp(
-            title: "mxpoch's website",
+            title: "website @mxpoch",
             theme: ThemeData(
                 useMaterial3: true,
                 colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueAccent),
@@ -54,12 +54,38 @@ class MainPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: ListView(
-      children: [
-        GreetingCard(),
-        Curation(),
-      ],
-    ));
+        body: ListView(children: [
+      GreetingCard(),
+      ArrowBox(),
+      Curation(),
+    ]));
+  }
+}
+
+class ArrowBox extends StatelessWidget {
+  const ArrowBox({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 20, 0, 10),
+      child: Container(
+          decoration: BoxDecoration(
+              color: Theme.of(context).canvasColor,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.25),
+                  spreadRadius: 3,
+                  blurRadius: 5,
+                  offset: Offset(3, 10),
+                )
+              ]),
+          height: 40,
+          width: MediaQuery.of(context).size.width,
+          child:
+              SizedBox(height: 20, child: Icon(Icons.arrow_downward_rounded))),
+    );
   }
 }
 
@@ -291,8 +317,11 @@ class ProjectMenu extends StatelessWidget {
                     children: getPosts(snapshot.data!)
                         .mapIndexed((i, e) => ListTile(
                               title: Text(e),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
                               mouseCursor: MaterialStateMouseCursor.clickable,
-                              hoverColor: Colors.grey[400],
+                              hoverColor: Colors.grey[100],
                               onTap: () {
                                 changeProject(i);
                               },
@@ -353,13 +382,13 @@ class GreetingCard extends StatelessWidget {
                 width: desiredWidth,
                 child: Column(
                   children: [
-                    Text(
+                    SelectableText(
                       '"I am enough of the artist to draw freely upon my imagination. Imagination is more important than knowledge. Knowledge is limited. Imagination encircles the world."',
                       textAlign: TextAlign.left,
                       style:
                           TextStyle(color: Color.fromARGB(255, 107, 107, 107)),
                     ),
-                    Text(
+                    SelectableText(
                       "- Einstein explaining why he is so smart.                                            ",
                       textAlign: TextAlign.right,
                       style:
@@ -417,14 +446,14 @@ class _TitleCardState extends State<TitleCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("I learn to learn to learn.",
+                      SelectableText("I learn to learn to learn.",
                           style: TextStyle(fontSize: 20)),
-                      Text(
+                      SelectableText(
                           "I spend most of my days grokking things I find interesting (everything) and how to grok better.",
                           style: TextStyle(fontSize: 20)),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 50, 0, 100),
-                        child: Text("Here are some things I did:",
+                        padding: const EdgeInsets.fromLTRB(0, 50, 0, 60),
+                        child: SelectableText("Here are some things I did:",
                             style: TextStyle(fontSize: 20)),
                       )
                     ],
