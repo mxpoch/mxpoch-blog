@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:tuple/tuple.dart';
 import 'package:collection/collection.dart';
 import 'package:http/http.dart' as http;
+import 'package:markdown/markdown.dart' as md;
 import 'dart:convert';
 
 void main() {
@@ -197,7 +198,7 @@ class _BlogState extends State<Blog> with TickerProviderStateMixin {
     return Row(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(60, 0, 50, 0),
+          padding: const EdgeInsets.fromLTRB(160, 0, 0, 0),
           child: ProjectMenu(
               tabIndex: widget.tabIndex,
               changeProject: widget.changeProject,
@@ -206,7 +207,7 @@ class _BlogState extends State<Blog> with TickerProviderStateMixin {
         ),
         SizedBox(
           height: MediaQuery.of(context).size.height * 0.15,
-          width: MediaQuery.of(context).size.width * 0.15,
+          width: MediaQuery.of(context).size.width * 0.07,
         ),
         BlogViewer(
             projectSelector: widget.projectSelector, blogData: widget.blogData),
@@ -242,7 +243,7 @@ class _BlogViewerState extends State<BlogViewer> {
           right: BorderSide(width: 0.5, color: Colors.grey),
         )),
         height: MediaQuery.of(context).size.height * 0.75,
-        width: MediaQuery.of(context).size.width * 0.4,
+        width: MediaQuery.of(context).size.width * 0.45,
         child: FutureBuilder(
             future: widget.blogData,
             builder: (context, snapshot) {
@@ -250,8 +251,21 @@ class _BlogViewerState extends State<BlogViewer> {
                 return Text("Loading blog post...");
               }
               return Markdown(
-                  data: getContent(snapshot.data!, widget.projectSelector),
-                  selectable: true);
+                data: getContent(snapshot.data!, widget.projectSelector),
+                selectable: true,
+                styleSheet: MarkdownStyleSheet.fromTheme(ThemeData(
+                    textTheme: GoogleFonts.poppinsTextTheme(
+                            Theme.of(context).textTheme)
+                        .copyWith(
+                            bodyMedium: GoogleFonts.poppins(fontSize: 14)))),
+                extensionSet: md.ExtensionSet(
+                  md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+                  <md.InlineSyntax>[
+                    md.EmojiSyntax(),
+                    ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes
+                  ],
+                ),
+              );
             }));
   }
 }
@@ -295,13 +309,20 @@ class ProjectMenu extends StatelessWidget {
             ColoredSquare(Color.fromARGB(255, 224, 15, 0)),
             ColoredSquare(Color.fromARGB(255, 0, 212, 0)),
             Padding(
-              padding: const EdgeInsets.fromLTRB(0, 0, 225, 0),
+              padding: const EdgeInsets.fromLTRB(0, 0, 160, 0),
               child: ColoredSquare(Color.fromARGB(255, 0, 89, 255)),
             ),
           ],
         ),
       ),
-      Text("In chronological order: ", style: TextStyle(fontSize: 25)),
+      Padding(
+        padding: const EdgeInsets.only(right: 105),
+        child: Text(
+          "In order: ",
+          style: TextStyle(fontSize: 25),
+          textAlign: TextAlign.left,
+        ),
+      ),
       Padding(
         padding: const EdgeInsets.fromLTRB(0, 10, 70, 0),
         child: SizedBox(
@@ -316,7 +337,10 @@ class ProjectMenu extends StatelessWidget {
                   return ListView(
                     children: getPosts(snapshot.data!)
                         .mapIndexed((i, e) => ListTile(
-                              title: Text(e),
+                              visualDensity:
+                                  VisualDensity(horizontal: 0, vertical: -4),
+                              title: Text(e,
+                                  style: TextStyle(fontFamily: 'RobotoMono')),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
                               ),
